@@ -17,6 +17,7 @@ from navai.models.depth import MidasDepthEstimator
 from navai.models.detector import YoloDetector
 from navai.models.fusion import Detection, fuse_detections
 from navai.models.obstacles import detect_depth_obstacles
+from navai.models.risk import rank_navigation_risks, select_alert_detection
 from navai.ui.overlay import draw_overlay
 from navai.ui.websocket_bridge import WebSocketBridge
 from navai.utils.fps_counter import FPSCounter
@@ -104,15 +105,30 @@ def main() -> int:
 
             boxes = detector.detect(frame)
             depth_m = depth.estimate(frame)
-            detections = fuse_detections(boxes, depth_m, CONFIG.danger_distance_m, alert_distance_m)
+            detections = fuse_detections(
+                boxes,
+                depth_m,
+                CONFIG.danger_distance_m,
+                alert_distance_m,
+                CONFIG.min_distance_m,
+                CONFIG.max_distance_m,
+            )
             detections.extend(detect_depth_obstacles(depth_m, frame.shape, detections, CONFIG.danger_distance_m, alert_distance_m))
-            detections.sort(key=lambda item: item.distance_m)
+            detections = rank_navigation_risks(detections, CONFIG.danger_distance_m, alert_distance_m, CONFIG.max_distance_m)
             fps = fps_counter.tick()
             gpu_stats = gpu_monitor.read()
 
-            nearest = detections[0] if detections else None
-            if nearest and nearest.distance_m < alert_distance_m:
-                if voice.say(nearest.label, alert_text(nearest, CONFIG.danger_distance_m)):
+            nearest = select_alert_detection(detections)
+            if nearest:
+                alert_key = f"{nearest.label}:{nearest.direction}:{nearest.priority}"
+                cooldown = CONFIG.voice_cooldown_s if nearest.priority == "danger" else CONFIG.repeated_alert_cooldown_s
+                voice.cooldown_s = cooldown
+                if voice.say(
+                    alert_key,
+                    alert_text(nearest, CONFIG.danger_distance_m),
+                    distance_m=nearest.distance_m,
+                    distance_delta_m=CONFIG.repeated_alert_distance_delta_m,
+                ):
                     alert_count += 1
 
             while assistant_worker and not questions.empty():

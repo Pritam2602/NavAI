@@ -21,7 +21,7 @@ def detect_depth_obstacles(
     if front:
         obstacles.append(front)
 
-    surface = _wide_surface(depth_m, frame_w, frame_h, existing, danger_m, caution_m)
+    surface = _unknown_surface_ahead(depth_m, frame_w, frame_h, existing, danger_m, caution_m)
     if surface:
         obstacles.append(surface)
 
@@ -63,7 +63,7 @@ def _front_obstacle(
     )
 
 
-def _wide_surface(
+def _unknown_surface_ahead(
     depth_m: np.ndarray,
     frame_w: int,
     frame_h: int,
@@ -71,28 +71,38 @@ def _wide_surface(
     danger_m: float,
     caution_m: float,
 ) -> Detection | None:
-    if any(det.label in {"wall", "surface"} for det in existing):
+    if any(det.label == "unknown surface ahead" for det in existing):
         return None
 
     h, w = depth_m.shape[:2]
-    roi = depth_m[int(h * 0.30) : int(h * 0.75), int(w * 0.18) : int(w * 0.82)]
+    roi = depth_m[int(h * 0.28) : int(h * 0.78), int(w * 0.22) : int(w * 0.78)]
     if roi.size == 0:
         return None
 
-    distance = float(np.nanmedian(roi))
+    distance = float(np.nanpercentile(roi, 35))
     close_ratio = float(np.mean(roi < caution_m))
+    very_close_ratio = float(np.mean(roi < danger_m))
     texture = float(np.nanstd(roi))
-    if distance >= caution_m or close_ratio < 0.45 or texture > 0.75:
+
+    # A broad, relatively coherent close region is useful to report even if YOLO
+    # cannot name it. Keep the label generic to avoid false semantic claims.
+    if distance >= caution_m or close_ratio < 0.28 or texture > 1.25:
+        return None
+    if any(_overlaps_front(det) and det.distance_m <= distance + 0.4 for det in existing):
         return None
 
     return Detection(
-        label="wall/surface",
-        confidence=min(0.92, close_ratio),
+        label="unknown surface ahead",
+        confidence=min(0.92, close_ratio + very_close_ratio),
         distance_m=distance,
         direction="FRONT",
-        xyxy=(frame_w * 0.18, frame_h * 0.30, frame_w * 0.82, frame_h * 0.75),
+        xyxy=(frame_w * 0.22, frame_h * 0.28, frame_w * 0.78, frame_h * 0.78),
         priority=priority_for_distance(distance, danger_m, caution_m),
     )
+
+
+def _overlaps_front(detection: Detection) -> bool:
+    return detection.direction == "FRONT" and detection.label not in {"possible stairs/drop"}
 
 
 def _possible_drop_or_stairs(

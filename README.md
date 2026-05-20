@@ -2,7 +2,9 @@
 
 NAVAI is a local real-time assistive navigation backend. It combines YOLOv8 object detection, MiDaS depth estimation, distance/direction fusion, non-blocking voice guidance, an OpenCV HUD, GPU metrics, and a WebSocket feed for the dashboard.
 
-It also includes a depth-based unknown obstacle layer for surfaces YOLO may not classify, such as close walls, generic front obstacles, and possible stairs/drop regions. These are heuristic alerts from the depth map, not custom-trained semantic classes.
+It also includes a depth-based unknown obstacle layer for things YOLO may not classify. It can report generic front obstacles, unknown close surfaces ahead, and possible stairs/drop regions. These are heuristic alerts from the depth map, not custom-trained semantic classes.
+
+NAVAI uses a navigation risk engine instead of a narrow indoor-only class filter. It keeps broad real-world classes for outdoor use, but suppresses weak low-confidence detections and ranks alerts by object type, confidence, direction, distance, and depth-based hazards.
 
 ## Manual Install
 
@@ -67,4 +69,4 @@ When the terminal says `Listening...`, ask a question aloud. The recognized ques
 
 ## Calibration
 
-MiDaS produces relative inverse depth, not true metric depth. Tune `depth_scale` and `depth_shift` in `navai/config.py` against measured distances for your camera.
+MiDaS produces relative inverse depth, not true metric depth. Tune `depth_scale` and `depth_shift` in `navai/config.py` against measured distances for your camera. NAVAI also uses bbox-size sanity caps so a large nearby object is not reported as unrealistically far away when MiDaS samples background.

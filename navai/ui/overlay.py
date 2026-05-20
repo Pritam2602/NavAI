@@ -37,7 +37,7 @@ def draw_overlay(
         x1, y1, x2, y2 = (int(v) for v in detection.xyxy)
         color = COLORS[detection.priority]
         cv2.rectangle(output, (x1, y1), (x2, y2), color, 2)
-        label = f"{detection.label} {detection.distance_m:.1f}m {detection.direction}"
+        label = f"{detection.label} {detection.distance_m:.1f}m {detection.direction} R{detection.risk_score:.0f}"
         cv2.putText(output, label, (x1, max(24, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
 
     hud = f"FPS {fps:04.1f} | GPU {gpu_stats.get('gpu_pct', 'n/a')}% | VRAM {gpu_stats.get('vram_gb', 'n/a')}GB | {gpu_stats.get('temp_c', 'n/a')}C"
