@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>NAVAI Project Report</title>
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; color: #111827; line-height: 1.45; }
+    h1 { font-size: 28px; color: #0f172a; text-align: center; margin-bottom: 4px; }
+    h2 { font-size: 20px; color: #0f172a; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 24px; }
+    h3 { font-size: 16px; color: #1e293b; margin-top: 16px; }
+    p { margin: 8px 0; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0 16px; }
+    th, td { border: 1px solid #cbd5e1; padding: 7px; vertical-align: top; }
+    th { background: #e2e8f0; }
+    code, pre { font-family: Consolas, monospace; }
+    pre { background: #f1f5f9; border: 1px solid #cbd5e1; padding: 10px; white-space: pre-wrap; }
+    .subtitle { text-align: center; color: #475569; margin-bottom: 22px; }
+  </style>
+</head>
+<body>
+  <h1>NAVAI - Autonomous Navigation System</h1>
+  <p class="subtitle">Project Report | Assistive AI Navigation for Blind and Low-Vision Users | May 2026</p>
+
+  <h2>1. Abstract</h2>
+  <p>
+    NAVAI is a real-time assistive navigation prototype designed to help blind and low-vision users understand nearby obstacles through voice guidance. The system uses a live camera feed, object detection, monocular depth estimation, spatial fusion, text-to-speech alerts, a WebSocket-powered dashboard, and an optional Gemini-based interactive assistant. The goal is to convert visual surroundings into short, practical, safety-focused audio responses such as "chair ahead, 1.6 metres" or "Stop. person very close, 0.9 metres."
+  </p>
+  <p>
+    The system runs locally for the computer vision pipeline and uses Gemini only for optional question-answering. It is intended as a strong real-world prototype and portfolio project demonstrating computer vision, depth estimation, sensor fusion, human-centered AI, and dashboard integration.
+  </p>
+
+  <h2>2. Problem Statement</h2>
+  <p>
+    Blind and low-vision users often need fast, practical awareness of obstacles, direction, and approximate distance. Traditional aids such as canes and guide dogs are valuable, but they do not identify object classes or describe spatial context verbally. NAVAI attempts to provide an additional assistive layer by detecting objects from a camera feed, estimating how close they are, and communicating the most important information through speech.
+  </p>
+
+  <h2>3. Objectives</h2>
+  <ul>
+    <li>Detect common objects in real time using YOLOv8.</li>
+    <li>Estimate approximate object distance using MiDaS monocular depth estimation.</li>
+    <li>Fuse bounding boxes and depth maps into practical navigation information.</li>
+    <li>Generate non-blocking voice alerts for nearby obstacles.</li>
+    <li>Display a polished live dashboard with detections, metrics, and voice guidance.</li>
+    <li>Add an interactive Gemini assistant so the user can ask questions about the scene.</li>
+    <li>Keep the backend modular, configurable, and suitable for further development.</li>
+  </ul>
+
+  <h2>4. System Overview</h2>
+  <pre>
+Camera Frame
+  -> YOLOv8 Object Detection
+  -> MiDaS Depth Estimation
+  -> Fusion Layer: object + distance + direction
+  -> Voice Alert Engine
+  -> OpenCV HUD
+  -> WebSocket JSON Feed
+  -> HTML Dashboard
+  -> Optional Gemini Assistant for user questions
+  </pre>
+
+  <p>
+    The main application is launched through <code>navai_system.py</code>. It continuously reads camera frames, detects objects, estimates depth, creates fused detection objects, speaks important warnings, renders an OpenCV overlay, and publishes telemetry to the browser dashboard.
+  </p>
+
+  <h2>5. File Structure</h2>
+  <pre>
+D:\VC
+|-- navai_system.py
+|-- blind_nav_system.html
+|-- dashboard_bridge.js
+|-- requirements.txt
+|-- requirements-app.txt
+|-- install_windows.bat
+|-- run_navai.bat
+|-- open_dashboard.bat
+|-- .env.example
+|-- README.md
+|-- tools/
+|   |-- check_env.py
+|-- navai/
+|   |-- config.py
+|   |-- models/
+|   |   |-- detector.py
+|   |   |-- depth.py
+|   |   |-- fusion.py
+|   |-- audio/
+|   |   |-- tts.py
+|   |-- ui/
+|   |   |-- overlay.py
+|   |   |-- websocket_bridge.py
+|   |-- utils/
+|   |   |-- fps_counter.py
+|   |   |-- gpu_monitor.py
+|   |-- assistant/
+|       |-- gemini_assistant.py
+|       |-- worker.py
+  </pre>
+
+  <h2>6. Major Components</h2>
+  <table>
+    <tr><th>Component</th><th>File</th><th>Purpose</th></tr>
+    <tr><td>Main Backend</td><td>navai_system.py</td><td>Controls camera loop, model inference, fusion, alerts, dashboard publishing, and assistant mode.</td></tr>
+    <tr><td>Configuration</td><td>navai/config.py</td><td>Stores camera settings, model name, thresholds, depth calibration, and WebSocket settings.</td></tr>
+    <tr><td>Object Detector</td><td>navai/models/detector.py</td><td>Loads YOLOv8 and returns detected objects with labels, confidence, and bounding boxes.</td></tr>
+    <tr><td>Depth Estimator</td><td>navai/models/depth.py</td><td>Loads MiDaS Small and estimates relative depth converted into approximate metres.</td></tr>
+    <tr><td>Fusion Layer</td><td>navai/models/fusion.py</td><td>Combines YOLO boxes and MiDaS depth to create distance, direction, and priority for each object.</td></tr>
+    <tr><td>Voice Alerts</td><td>navai/audio/tts.py</td><td>Uses a background TTS thread to speak warnings without blocking the camera loop.</td></tr>
+    <tr><td>OpenCV HUD</td><td>navai/ui/overlay.py</td><td>Draws bounding boxes, distance labels, depth heatmap, crosshair, FPS, GPU, and voice text.</td></tr>
+    <tr><td>WebSocket Bridge</td><td>navai/ui/websocket_bridge.py</td><td>Publishes live JSON data to the dashboard at ws://localhost:8765.</td></tr>
+    <tr><td>Dashboard</td><td>blind_nav_system.html</td><td>Polished browser UI for live telemetry and visual monitoring.</td></tr>
+    <tr><td>Dashboard Connector</td><td>dashboard_bridge.js</td><td>Receives WebSocket messages and updates dashboard fields.</td></tr>
+    <tr><td>Gemini Assistant</td><td>navai/assistant/gemini_assistant.py</td><td>Sends current scene context and user questions to Gemini models.</td></tr>
+    <tr><td>Assistant Worker</td><td>navai/assistant/worker.py</td><td>Runs Gemini requests in the background so the camera loop remains smooth.</td></tr>
+  </table>
+
+  <h2>7. Object Detection</h2>
+  <p>
+    NAVAI uses YOLOv8n, a lightweight object detection model from the Ultralytics YOLO family. The detector receives each camera frame and returns normalized and pixel bounding boxes. Each detection includes:
+  </p>
+  <ul>
+    <li>Object label, such as person, chair, bottle, bag, etc.</li>
+    <li>Confidence score.</li>
+    <li>Bounding box coordinates.</li>
+    <li>Normalized coordinates for direction calculation.</li>
+  </ul>
+  <p>
+    If CUDA is available, the detector uses the GPU and half precision where possible. A CPU fallback option is available through the <code>--cpu</code> flag.
+  </p>
+
+  <h2>8. Depth Estimation</h2>
+  <p>
+    NAVAI uses MiDaS Small for monocular depth estimation. MiDaS estimates relative inverse depth from a single camera image. Since monocular depth does not produce exact real-world distance by default, NAVAI converts normalized depth into approximate metres using calibration constants:
+  </p>
+  <pre>
+depth_metres = DEPTH_SCALE / (depth_normalised + DEPTH_SHIFT)
+  </pre>
+  <p>
+    The default values are <code>DEPTH_SCALE = 3.5</code> and <code>DEPTH_SHIFT = 0.1</code>. These should be calibrated against real measured distances for the specific camera.
+  </p>
+
+  <h2>9. Fusion Logic</h2>
+  <p>
+    The fusion layer combines each YOLO bounding box with the MiDaS depth map. For each object, NAVAI samples the depth around the centre of the bounding box and assigns a practical direction:
+  </p>
+  <pre>
+if object centre x < 0.33: direction = LEFT
+elif object centre x < 0.66: direction = FRONT
+else: direction = RIGHT
+  </pre>
+  <p>
+    It also assigns a priority:
+  </p>
+  <ul>
+    <li><b>Danger:</b> object distance below 1.2 metres.</li>
+    <li><b>Caution:</b> object distance below 2.5 metres.</li>
+    <li><b>Clear:</b> object is farther away.</li>
+  </ul>
+
+  <h2>10. Voice Alert System</h2>
+  <p>
+    The TTS engine is non-blocking. It uses a queue and a background thread so that speech does not freeze video processing. The system speaks only the most relevant nearby obstacle and uses cooldown logic to avoid repeating the same warning too frequently.
+  </p>
+  <p>Example alerts:</p>
+  <pre>
+person ahead, 2.1 metres.
+chair left, 1.4 metres.
+Stop. bag very close, 0.8 metres.
+  </pre>
+
+  <h2>11. Gemini Interactive Assistant</h2>
+  <p>
+    NAVAI now includes an optional chatbot-style assistant powered by Gemini. It does not directly view the camera image. Instead, it receives structured scene data generated by the local computer vision pipeline. The user can type questions in the terminal while the camera is running.
+  </p>
+  <p>Example user questions:</p>
+  <pre>
+what is ahead?
+is the path clear?
+what is on my left?
+can I move forward?
+  </pre>
+  <p>
+    NAVAI sends Gemini a prompt containing only the latest scene JSON and the user question. The prompt instructs Gemini to be brief, practical, and safety-focused, and to avoid inventing objects.
+  </p>
+  <p>Example scene context sent to Gemini:</p>
+  <pre>
+{
+  "fps": 28.4,
+  "latest_voice_alert": "chair ahead, 1.6 metres",
+  "detections_nearest_first": [
+    {
+      "label": "chair",
+      "confidence": 0.82,
+      "distance_m": 1.6,
+      "direction": "FRONT",
+      "priority": "caution"
+    }
+  ]
+}
+  </pre>
+  <p>
+    Gemini then answers in natural language, for example: "A chair is ahead about 1.6 metres away. Slow down or move around it."
+  </p>
+  <p>
+    The assistant supports both typed questions and optional speech-to-text input. With voice input enabled, the microphone listens for a spoken question, converts it to text, and sends the text through the same Gemini assistant pipeline.
+  </p>
+  <p>
+    The system uses three Gemini models in fallback order:
+  </p>
+  <ol>
+    <li>gemini-2.5-flash-lite</li>
+    <li>gemini-2.5-flash</li>
+    <li>gemini-2.5-pro</li>
+  </ol>
+  <p>
+    If the first model fails, the next model is tried automatically. Gemini runs in a background worker thread, so the camera loop continues while the assistant thinks.
+  </p>
+
+  <h2>12. Dashboard and UI Integration</h2>
+  <p>
+    The browser dashboard is connected through WebSocket. The backend publishes JSON to <code>ws://localhost:8765</code>. The file <code>dashboard_bridge.js</code> listens for messages and updates the HTML UI.
+  </p>
+  <p>Data sent to the dashboard includes:</p>
+  <ul>
+    <li>FPS.</li>
+    <li>Detection count.</li>
+    <li>Detected objects with distance and direction.</li>
+    <li>Nearest object distance.</li>
+    <li>GPU utilization.</li>
+    <li>VRAM usage.</li>
+    <li>Temperature.</li>
+    <li>Voice alert text.</li>
+    <li>Gemini assistant answer and model used.</li>
+  </ul>
+  <p>
+    The dashboard file is <code>blind_nav_system.html</code>. The helper script <code>open_dashboard.bat</code> opens it in the browser.
+  </p>
+
+  <h2>13. Hardware and Runtime Target</h2>
+  <table>
+    <tr><th>Resource</th><th>Target</th></tr>
+    <tr><td>GPU</td><td>NVIDIA RTX 3050 6GB or similar CUDA-capable GPU.</td></tr>
+    <tr><td>Camera</td><td>Laptop front camera, USB webcam, phone camera bridge, or wearable camera.</td></tr>
+    <tr><td>Operating System</td><td>Windows development environment.</td></tr>
+    <tr><td>Python</td><td>Python 3.10 tested in the current workspace.</td></tr>
+  </table>
+  <p>
+    A laptop front camera works for demonstration because OpenCV treats it as camera index 0. However, for practical blind navigation, the camera should face forward from the user's perspective, such as on glasses, a chest mount, a phone, or an external camera.
+  </p>
+
+  <h2>14. Installation</h2>
+  <p>Recommended commands:</p>
+  <pre>
+cd /d D:\VC
+.\venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+.\venv\Scripts\python.exe -m pip install -r requirements-app.txt
+.\venv\Scripts\python.exe tools\check_env.py
+  </pre>
+  <p>
+    If using a different virtual environment name, update the Python path accordingly.
+  </p>
+
+  <h2>15. Gemini API Configuration</h2>
+  <p>Create a file named <code>.env</code> in <code>D:\VC</code>:</p>
+  <pre>
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODELS=gemini-2.5-flash-lite,gemini-2.5-flash,gemini-2.5-pro
+  </pre>
+
+  <h2>16. Running the Project</h2>
+  <p>Run the backend with dashboard and assistant support:</p>
+  <pre>
+.\run_navai.bat --assistant
+  </pre>
+  <p>Run with speech-to-text questions:</p>
+  <pre>
+.\venv\Scripts\python.exe -m pip install SpeechRecognition PyAudio
+.\run_navai.bat --assistant --voice-input
+  </pre>
+  <p>Open the dashboard:</p>
+  <pre>
+.\open_dashboard.bat
+  </pre>
+  <p>Camera controls inside the OpenCV window:</p>
+  <ul>
+    <li><code>q</code> - quit.</li>
+    <li><code>d</code> - toggle depth overlay.</li>
+    <li><code>m</code> - mute or unmute TTS.</li>
+    <li><code>+</code> / <code>-</code> - adjust alert sensitivity distance.</li>
+  </ul>
+
+  <h2>17. How It Helps Blind Users</h2>
+  <p>
+    NAVAI helps by translating visual surroundings into simple spoken information. It can warn users about obstacles, tell them roughly where an object is, estimate how close it is, and answer questions about the current scene. This can improve awareness in indoor environments such as rooms, labs, hallways, and classrooms.
+  </p>
+  <p>
+    Example:
+  </p>
+  <pre>
+User asks: Is the path clear?
+NAVAI answers: A chair is ahead about 1.4 metres away. Move slightly right before continuing.
+  </pre>
+
+  <h2>18. Safety Limitations</h2>
+  <ul>
+    <li>Monocular depth is approximate and must be calibrated.</li>
+    <li>The system should assist, not replace, a cane, guide dog, or human judgment.</li>
+    <li>Lighting, camera angle, motion blur, and occlusion can reduce accuracy.</li>
+    <li>A laptop front camera is useful for demos but not ideal for real walking navigation.</li>
+    <li>Gemini responses depend on local detection data and should not invent missing objects.</li>
+  </ul>
+
+  <h2>19. Future Enhancements</h2>
+  <ul>
+    <li>Add speech-to-text so users can ask questions by voice instead of typing.</li>
+    <li>Add a phone or wearable camera input.</li>
+    <li>Add path planning and safe direction recommendation.</li>
+    <li>Add object tracking to reduce repeated alerts.</li>
+    <li>Add offline LLM fallback for no-internet assistant mode.</li>
+    <li>Add a true live video feed inside the browser dashboard.</li>
+    <li>Create a packaged installer for Windows.</li>
+  </ul>
+
+  <h2>20. Conclusion</h2>
+  <p>
+    NAVAI is a practical, real-world AI system that combines computer vision, depth estimation, speech output, dashboard visualization, and Gemini-based natural language interaction. It demonstrates a full-stack assistive AI pipeline from raw camera frames to human-friendly spoken guidance. With calibration, improved camera placement, and additional safety testing, the project can evolve from a strong prototype into a more complete assistive navigation platform.
+  </p>
+</body>
+</html>

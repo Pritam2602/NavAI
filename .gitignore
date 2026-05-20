@@ -1,0 +1,44 @@
+# Secrets
+.env
+
+# Virtual environments
+venv/
+.venv/
+.venv_ok/
+env/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# Model weights and ML caches
+*.pt
+*.pth
+*.onnx
+*.engine
+runs/
+weights/
+models/*.pt
+
+# Local runtime/cache output
+.tmp/
+logs/
+*.log
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
+.DS_Store
+

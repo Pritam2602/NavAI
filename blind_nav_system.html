@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAVAI — Autonomous Navigation System</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700;900&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10;
+    --surface: #0d1318;
+    --panel: #101820;
+    --border: #1a2530;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #39ff14;
+    --warn: #ffcc00;
+    --danger: #ff3b3b;
+    --text: #c8dce8;
+    --muted: #4a6478;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+    --cond: 'Barlow Condensed', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,229,255,0.015) 2px,
+      rgba(0,229,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Grid background */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,12,16,0.95);
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 42px; height: 42px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    animation: pulse-ring 2s ease-in-out infinite;
+  }
+
+  .logo-icon::before {
+    content: '';
+    position: absolute;
+    width: 26px; height: 26px;
+    background: radial-gradient(circle, var(--accent) 30%, transparent 70%);
+    border-radius: 50%;
+    opacity: 0.6;
+  }
+
+  .logo-icon svg { position: relative; z-index: 1; }
+
+  @keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0,229,255,0.4), 0 0 12px rgba(0,229,255,0.2); }
+    50% { box-shadow: 0 0 0 6px rgba(0,229,255,0), 0 0 20px rgba(0,229,255,0.4); }
+  }
+
+  .logo-text h1 {
+    font-family: var(--cond);
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--accent);
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .logo-text p {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent3);
+    box-shadow: 0 0 8px var(--accent3);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+
+  .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .dot.off { background: var(--muted); box-shadow: none; animation: none; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .gpu-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: rgba(0,229,255,0.08);
+    border: 1px solid rgba(0,229,255,0.2);
+    color: var(--accent);
+    padding: 4px 10px;
+    letter-spacing: 1px;
+  }
+
+  /* ── MAIN GRID ── */
+  .main {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    grid-template-rows: auto 1fr auto;
+    gap: 1px;
+    background: var(--border);
+    height: calc(100vh - 71px);
+  }
+
+  .panel {
+    background: var(--panel);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-label span { color: var(--accent); }
+
+  /* ── CAMERA FEED ── */
+  .camera-panel {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    background: #000;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .camera-feed {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #050a0f 0%, #0a1520 100%);
+  }
+
+  /* Simulated camera scene */
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .scene-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, #1a2535 0%, #0d1520 50%, #05080f 100%);
+  }
+
+  /* Floor perspective lines */
+  .scene-bg::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200%;
+    height: 40%;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent calc(10% - 1px),
+      rgba(0,229,255,0.06) calc(10% - 1px),
+      rgba(0,229,255,0.06) 10%
+    );
+    clip-path: polygon(40% 0%, 60% 0%, 100% 100%, 0% 100%);
+  }
+
+  /* Detection boxes */
+  .det-box {
+    position: absolute;
+    border: 2px solid;
+    animation: det-appear 0.3s ease-out;
+  }
+
+  @keyframes det-appear {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .det-box .box-label {
+    position: absolute;
+    top: -22px;
+    left: -1px;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+
+  .det-box .box-conf {
+    position: absolute;
+    bottom: -20px;
+    right: -1px;
+    font-family: var(--mono);
+    font-size: 9px;
+    opacity: 0.8;
+  }
+
+  /* Box color variants */
+  .box-person { border-color: var(--accent); }
+  .box-person .box-label { background: var(--accent); color: #000; }
+  .box-chair { border-color: var(--warn); }
+  .box-chair .box-label { background: var(--warn); color: #000; }
+  .box-door { border-color: var(--accent3); }
+  .box-door .box-label { background: var(--accent3); color: #000; }
+  .box-obstacle { border-color: var(--danger); }
+  .box-obstacle .box-label { background: var(--danger); color: #fff; }
+
+  /* Depth gradient overlay */
+  .depth-overlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0.25;
+    background: radial-gradient(
+      ellipse 80% 60% at 50% 60%,
+      rgba(255,107,53,0.8) 0%,
+      rgba(255,204,0,0.5) 30%,
+      rgba(0,229,255,0.3) 60%,
+      transparent 100%
+    );
+    mix-blend-mode: screen;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  /* Crosshair */
+  .crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px; height: 40px;
+    pointer-events: none;
+  }
+
+  .crosshair::before, .crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(0,229,255,0.5);
+  }
+
+  .crosshair::before { width: 1px; height: 100%; left: 50%; }
+  .crosshair::after { height: 1px; width: 100%; top: 50%; }
+
+  /* Corner brackets */
+  .corner {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent);
+    border-style: solid;
+    opacity: 0.6;
+  }
+
+  .c-tl { top: 16px; left: 16px; border-width: 2px 0 0 2px; }
+  .c-tr { top: 16px; right: 16px; border-width: 2px 2px 0 0; }
+  .c-bl { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; }
+  .c-br { bottom: 16px; right: 16px; border-width: 0 2px 2px 0; }
+
+  /* FPS / info overlay */
+  .cam-overlay-info {
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    line-height: 1.8;
+    opacity: 0.8;
+  }
+
+  .cam-overlay-right {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text);
+    line-height: 1.8;
+    text-align: right;
+    opacity: 0.7;
+  }
+
+  /* Mode toggle bottom */
+  .cam-modes {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 2px;
+  }
+
+  .cam-mode-btn {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    background: rgba(8,12,16,0.8);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .cam-mode-btn.active {
+    background: rgba(0,229,255,0.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── LEFT PANEL — DETECTIONS ── */
+  .left-panel {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detection-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .detection-list::-webkit-scrollbar { width: 4px; }
+  .detection-list::-webkit-scrollbar-track { background: transparent; }
+  .detection-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .det-item {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-left: 3px solid;
+    padding: 10px 12px;
+    position: relative;
+    transition: all 0.3s;
+    animation: slide-in 0.3s ease-out;
+  }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .det-item:hover { background: rgba(255,255,255,0.04); }
+
+  .det-item.priority-high { border-left-color: var(--danger); }
+  .det-item.priority-med { border-left-color: var(--warn); }
+  .det-item.priority-low { border-left-color: var(--accent3); }
+  .det-item.priority-info { border-left-color: var(--accent); }
+
+  .det-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .det-item-name {
+    font-family: var(--cond);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .det-item-conf {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+  }
+
+  .det-item-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .det-item-meta span { color: var(--text); }
+
+  .depth-bar {
+    margin-top: 8px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .depth-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* ── RIGHT PANEL ── */
+  .right-panel {
+    grid-column: 3;
+    grid-row: 1 / 4;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* GPU Monitor */
+  .gpu-section {
+    padding: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .gpu-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .metric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 10px;
+  }
+
+  .metric-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 60px;
+  }
+
+  .metric-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .metric-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  .fill-cyan { background: var(--accent); box-shadow: 0 0 6px rgba(0,229,255,0.4); }
+  .fill-green { background: var(--accent3); box-shadow: 0 0 6px rgba(57,255,20,0.4); }
+  .fill-orange { background: var(--accent2); box-shadow: 0 0 6px rgba(255,107,53,0.4); }
+  .fill-warn { background: var(--warn); }
+
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* Voice guidance */
+  .voice-section {
+    padding: 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .voice-output {
+    background: rgba(0,229,255,0.04);
+    border: 1px solid rgba(0,229,255,0.15);
+    padding: 12px;
+    margin-top: 10px;
+    min-height: 60px;
+    position: relative;
+  }
+
+  .voice-text {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 300;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .voice-wave {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 10px;
+  }
+
+  .wave-bar {
+    width: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: wave-anim 0.8s ease-in-out infinite;
+    opacity: 0.7;
+  }
+
+  @keyframes wave-anim {
+    0%, 100% { height: 4px; }
+    50% { height: 16px; }
+  }
+
+  /* Nav map */
+  .nav-section {
+    padding: 14px;
+    flex: 1;
+    min-height: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mini-map {
+    width: 100%;
+    aspect-ratio: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    position: relative;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+
+  /* Map grid */
+  .mini-map::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .map-user {
+    position: absolute;
+    bottom: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px; height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent);
+  }
+
+  .map-user::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 12px solid rgba(0,229,255,0.4);
+  }
+
+  .map-obstacle {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-radius: 1px;
+  }
+
+  .map-path {
+    position: absolute;
+    bottom: 30%;
+    left: 50%;
+    width: 2px;
+    height: 40%;
+    background: linear-gradient(to top, var(--accent) 0%, transparent 100%);
+    transform: translateX(-50%);
+    opacity: 0.5;
+  }
+
+  /* Model pipeline */
+  .pipeline-section {
+    padding: 14px;
+    flex-shrink: 0;
+  }
+
+  .pipeline {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .pipe-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    position: relative;
+  }
+
+  .pipe-step.active {
+    border-color: rgba(0,229,255,0.3);
+    background: rgba(0,229,255,0.04);
+  }
+
+  .pipe-step.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .pipe-icon {
+    font-size: 14px;
+    width: 20px;
+    text-align: center;
+  }
+
+  .pipe-name {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .pipe-fps {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--accent3);
+  }
+
+  /* ── BOTTOM PANELS ── */
+  .bottom-bar {
+    grid-column: 2;
+    grid-row: 3;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-top: none;
+  }
+
+  .stat-tile {
+    background: var(--panel);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-tile-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .stat-tile-val {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  .val-cyan { color: var(--accent); text-shadow: 0 0 20px rgba(0,229,255,0.3); }
+  .val-green { color: var(--accent3); text-shadow: 0 0 20px rgba(57,255,20,0.3); }
+  .val-orange { color: var(--accent2); }
+  .val-warn { color: var(--warn); }
+
+  .stat-tile-sub {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* Alert bar */
+  .alert-bar {
+    grid-column: 2;
+    grid-row: 3;
+    display: none; /* shown via JS */
+    align-items: center;
+    gap: 14px;
+    padding: 0 20px;
+    background: rgba(255,59,59,0.1);
+    border-top: 2px solid var(--danger);
+    animation: alert-flash 0.5s ease-in-out;
+  }
+
+  @keyframes alert-flash {
+    0%, 100% { background: rgba(255,59,59,0.1); }
+    50% { background: rgba(255,59,59,0.2); }
+  }
+
+  /* Scrollbar global */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+
+  /* Number counter animation */
+  .count-up { animation: count-flash 0.3s ease-out; }
+  @keyframes count-flash {
+    from { color: #fff; }
+    to { color: inherit; }
+  }
+
+  /* Control buttons */
+  .ctrl-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .ctrl-btn {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 7px 4px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .ctrl-btn:hover, .ctrl-btn.active {
+    background: rgba(0,229,255,0.08);
+    border-color: rgba(0,229,255,0.4);
+    color: var(--accent);
+  }
+
+  .ctrl-btn.danger { border-color: rgba(255,59,59,0.3); color: var(--danger); }
+  .ctrl-btn.danger:hover { background: rgba(255,59,59,0.08); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+        <path d="M12 6v2M12 16v2M6 12H4M20 12h-2"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <h1>NAVAI</h1>
+      <p>AUTONOMOUS BLIND NAVIGATION SYSTEM v2.1.0</p>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="status-badge"><div class="dot"></div> CAMERA ACTIVE</div>
+    <div class="status-badge"><div class="dot"></div> DETECTION RUNNING</div>
+    <div class="status-badge"><div class="dot warn"></div> VOICE READY</div>
+    <div class="gpu-badge">RTX 3050 · 6GB · CUDA 12.x</div>
+  </div>
+</header>
+
+<!-- MAIN GRID -->
+<div class="main">
+
+  <!-- LEFT: Detection List -->
+  <div class="panel left-panel">
+    <div class="panel-label">
+      DETECTIONS <span id="det-count">0</span>
+      <span id="det-fps">— FPS</span>
+    </div>
+    <div class="detection-list" id="det-list">
+      <!-- populated by JS -->
+    </div>
+    <div style="padding:10px 12px; border-top:1px solid var(--border);">
+      <div class="gpu-title">FILTERS</div>
+      <div class="ctrl-row">
+        <div class="ctrl-btn active" onclick="toggleFilter(this,'all')">ALL</div>
+        <div class="ctrl-btn" onclick="toggleFilter(this,'high')">⚠ HIGH</div>
+        <div class="ctrl-btn" onclick="toggleFilter(this,'people')">👤</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: Camera Feed -->
+  <div class="panel camera-panel">
+    <div class="camera-feed">
+      <div class="scene">
+        <div class="scene-bg"></div>
+
+        <!-- Depth overlay -->
+        <div class="depth-overlay" id="depth-overlay"></div>
+
+        <!-- Person detection box -->
+        <div class="det-box box-person" style="left:18%;top:22%;width:22%;height:50%;">
+          <div class="box-label">PERSON</div>
+          <div class="box-conf" style="color:var(--accent);">0.94</div>
+        </div>
+
+        <!-- Chair detection box -->
+        <div class="det-box box-chair" style="left:62%;top:50%;width:18%;height:30%;">
+          <div class="box-label">CHAIR</div>
+          <div class="box-conf" style="color:var(--warn);">0.87</div>
+        </div>
+
+        <!-- Obstacle -->
+        <div class="det-box box-obstacle" style="left:48%;top:58%;width:10%;height:18%;">
+          <div class="box-label">OBSTACLE</div>
+          <div class="box-conf" style="color:var(--danger);">0.91</div>
+        </div>
+
+        <!-- Door -->
+        <div class="det-box box-door" style="left:76%;top:10%;width:14%;height:72%;">
+          <div class="box-label">DOOR</div>
+          <div class="box-conf" style="color:var(--accent3);">0.82</div>
+        </div>
+
+        <!-- Crosshair -->
+        <div class="crosshair"></div>
+
+        <!-- Depth scan line -->
+        <div id="scan-line" style="position:absolute;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.4;animation:scan 2.5s linear infinite;"></div>
+      </div>
+
+      <!-- Corner brackets -->
+      <div class="corner c-tl"></div>
+      <div class="corner c-tr"></div>
+      <div class="corner c-bl"></div>
+      <div class="corner c-br"></div>
+
+      <!-- Overlay info -->
+      <div class="cam-overlay-info">
+        <div id="fps-display">FPS: 31</div>
+        <div>RES: 640×480</div>
+        <div>MODE: YOLO+DEPTH</div>
+        <div>CONF: 0.45</div>
+      </div>
+
+      <div class="cam-overlay-right">
+        <div id="time-display"></div>
+        <div>CAM: USB 0</div>
+        <div>TORCH: ON</div>
+        <div>VRAM: 1.7 GB</div>
+      </div>
+
+      <!-- Mode buttons -->
+      <div class="cam-modes">
+        <div class="cam-mode-btn active" onclick="setMode(this,'RGB')">RGB</div>
+        <div class="cam-mode-btn" onclick="setMode(this,'DEPTH')">DEPTH</div>
+        <div class="cam-mode-btn" onclick="setMode(this,'OVERLAY')">OVERLAY</div>
+        <div class="cam-mode-btn" onclick="setMode(this,'EDGE')">EDGE</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM STATS -->
+  <div class="bottom-bar" style="grid-row:3;grid-column:2;">
+    <div class="stat-tile">
+      <div class="stat-tile-label">DETECTIONS</div>
+      <div class="stat-tile-val val-cyan" id="stat-det">4</div>
+      <div class="stat-tile-sub">OBJECTS IN FRAME</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-tile-label">NEAREST OBSTACLE</div>
+      <div class="stat-tile-val val-orange" id="stat-dist">1.2<span style="font-size:14px;font-weight:300;">m</span></div>
+      <div class="stat-tile-sub">AHEAD · CAUTION</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-tile-label">INFERENCE TIME</div>
+      <div class="stat-tile-val val-green" id="stat-inf">28<span style="font-size:14px;font-weight:300;">ms</span></div>
+      <div class="stat-tile-sub">YOLO + MIDAS</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-tile-label">AUDIO ALERTS</div>
+      <div class="stat-tile-val val-warn" id="stat-alerts">7</div>
+      <div class="stat-tile-sub">THIS SESSION</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: GPU + Voice + Map + Pipeline -->
+  <div class="panel right-panel">
+    <div class="panel-label">SYSTEM MONITOR</div>
+
+    <!-- GPU Metrics -->
+    <div class="gpu-section">
+      <div class="gpu-title">RTX 3050 · GPU METRICS</div>
+      <div class="metric-row">
+        <div class="metric-label">VRAM</div>
+        <div class="metric-bar"><div class="metric-fill fill-cyan" id="vram-bar" style="width:28%"></div></div>
+        <div class="metric-val" id="vram-val">1.7G</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">GPU LOAD</div>
+        <div class="metric-bar"><div class="metric-fill fill-green" id="gpu-bar" style="width:45%"></div></div>
+        <div class="metric-val" id="gpu-val">45%</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">TEMP</div>
+        <div class="metric-bar"><div class="metric-fill fill-orange" id="temp-bar" style="width:58%"></div></div>
+        <div class="metric-val" id="temp-val">58°C</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label">CPU</div>
+        <div class="metric-bar"><div class="metric-fill fill-warn" id="cpu-bar" style="width:32%"></div></div>
+        <div class="metric-val" id="cpu-val">32%</div>
+      </div>
+    </div>
+
+    <!-- Voice Guidance -->
+    <div class="voice-section">
+      <div class="gpu-title">VOICE GUIDANCE — TTS</div>
+      <div class="voice-output">
+        <div class="voice-text" id="voice-text">
+          "Obstacle detected 1.2 meters ahead — move left."
+        </div>
+        <div class="voice-wave" id="voice-wave">
+          <div class="wave-bar" style="animation-delay:0s; height:6px;"></div>
+          <div class="wave-bar" style="animation-delay:0.1s;"></div>
+          <div class="wave-bar" style="animation-delay:0.2s;"></div>
+          <div class="wave-bar" style="animation-delay:0.15s;"></div>
+          <div class="wave-bar" style="animation-delay:0.05s;"></div>
+          <div class="wave-bar" style="animation-delay:0.25s;"></div>
+          <div class="wave-bar" style="animation-delay:0.3s; height:6px;"></div>
+        </div>
+      </div>
+      <div class="ctrl-row" style="margin-top:8px;">
+        <div class="ctrl-btn active" id="tts-btn" onclick="toggleTTS(this)">🔊 TTS ON</div>
+        <div class="ctrl-btn" onclick="">SPEED ▲</div>
+        <div class="ctrl-btn danger" onclick="">MUTE</div>
+      </div>
+    </div>
+
+    <!-- Mini Map -->
+    <div class="nav-section">
+      <div class="gpu-title">SPATIAL MAP</div>
+      <div class="mini-map">
+        <div class="map-path"></div>
+        <div class="map-user"></div>
+        <!-- obstacles on map -->
+        <div class="map-obstacle" style="width:12px;height:12px;background:rgba(255,59,59,0.5);border:1px solid var(--danger);top:38%;left:48%;"></div>
+        <div class="map-obstacle" style="width:8px;height:16px;background:rgba(255,204,0,0.4);border:1px solid var(--warn);top:20%;left:15%;"></div>
+        <div class="map-obstacle" style="width:10px;height:10px;background:rgba(0,229,255,0.3);border:1px solid var(--accent);top:25%;left:75%;"></div>
+      </div>
+    </div>
+
+    <!-- Model Pipeline -->
+    <div class="pipeline-section">
+      <div class="gpu-title">MODEL PIPELINE</div>
+      <div class="pipeline">
+        <div class="pipe-step active">
+          <div class="pipe-icon">📷</div>
+          <div class="pipe-name">Camera Capture</div>
+          <div class="pipe-fps" id="pipe-cap">30fps</div>
+        </div>
+        <div class="pipe-step active">
+          <div class="pipe-icon">🎯</div>
+          <div class="pipe-name">YOLOv8n Detect</div>
+          <div class="pipe-fps" id="pipe-yolo">31fps</div>
+        </div>
+        <div class="pipe-step active">
+          <div class="pipe-icon">🌊</div>
+          <div class="pipe-name">MiDaS Depth</div>
+          <div class="pipe-fps" id="pipe-midas">28fps</div>
+        </div>
+        <div class="pipe-step active">
+          <div class="pipe-icon">🧭</div>
+          <div class="pipe-name">Path Planner</div>
+          <div class="pipe-fps" id="pipe-path">60fps</div>
+        </div>
+        <div class="pipe-step active">
+          <div class="pipe-icon">🔊</div>
+          <div class="pipe-name">Speech TTS</div>
+          <div class="pipe-fps" id="pipe-tts">async</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<style>
+  @keyframes scan {
+    from { top: 0%; }
+    to { top: 100%; }
+  }
+
+  /* fix bottom bar overlap */
+  .main {
+    grid-template-rows: 1fr auto;
+  }
+  .camera-panel { grid-row: 1; }
+  .bottom-bar {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+</style>
+
+<script>
+// ── DETECTIONS DATA ──
+const detections = [
+  { name:'OBSTACLE', dist:'1.2m', dir:'FRONT', conf:91, priority:'high', color:'var(--danger)' },
+  { name:'PERSON', dist:'2.4m', dir:'LEFT', conf:94, priority:'info', color:'var(--accent)' },
+  { name:'CHAIR', dist:'3.1m', dir:'RIGHT', conf:87, priority:'med', color:'var(--warn)' },
+  { name:'DOOR', dist:'4.7m', dir:'FRONT-R', conf:82, priority:'low', color:'var(--accent3)' },
+];
+
+const voiceLines = [
+  '"Obstacle detected 1.2 meters ahead — move left."',
+  '"Person approaching from left, 2.4 meters away."',
+  '"Clear path to the right — door is 4.7 meters ahead."',
+  '"Caution — chair detected on right, 3.1 meters."',
+  '"Path is clear. Continue straight."',
+  '"Stop — obstacle very close. 0.8 meters ahead."',
+];
+
+function renderDetections() {
+  const list = document.getElementById('det-list');
+  list.innerHTML = '';
+  detections.forEach(d => {
+    const bar = 100 - (parseFloat(d.dist) / 6 * 100);
+    list.innerHTML += `
+      <div class="det-item priority-${d.priority}">
+        <div class="det-item-header">
+          <div class="det-item-name" style="color:${d.color}">${d.name}</div>
+          <div class="det-item-conf">${d.conf}%</div>
+        </div>
+        <div class="det-item-meta">
+          DIST <span>${d.dist}</span> &nbsp; DIR <span>${d.dir}</span>
+        </div>
+        <div class="depth-bar">
+          <div class="depth-fill" style="width:${bar}%;background:${d.color};opacity:0.7;"></div>
+        </div>
+      </div>
+    `;
+  });
+  document.getElementById('det-count').textContent = detections.length;
+}
+
+renderDetections();
+
+// ── CLOCK ──
+function updateTime() {
+  const now = new Date();
+  document.getElementById('time-display').textContent =
+    now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// ── FPS DISPLAY ──
+let fpsBase = 31;
+setInterval(() => {
+  const fps = fpsBase + Math.floor(Math.random() * 6) - 2;
+  document.getElementById('fps-display').textContent = `FPS: ${fps}`;
+  document.getElementById('det-fps').textContent = `${fps} FPS`;
+  document.getElementById('stat-inf').textContent = `${Math.floor(1000/fps)}<span style="font-size:14px;font-weight:300;">ms</span>`;
+  // pipe FPS
+  document.getElementById('pipe-yolo').textContent = `${fps}fps`;
+  document.getElementById('pipe-midas').textContent = `${fps-3}fps`;
+}, 1500);
+
+// ── GPU METRICS FLUCTUATION ──
+setInterval(() => {
+  const vram = 28 + Math.floor(Math.random()*8);
+  const gpu = 40 + Math.floor(Math.random()*20);
+  const temp = 55 + Math.floor(Math.random()*10);
+  const cpu = 28 + Math.floor(Math.random()*15);
+
+  document.getElementById('vram-bar').style.width = vram+'%';
+  document.getElementById('vram-val').textContent = (vram/17).toFixed(1)+'G';
+  document.getElementById('gpu-bar').style.width = gpu+'%';
+  document.getElementById('gpu-val').textContent = gpu+'%';
+  document.getElementById('temp-bar').style.width = temp+'%';
+  document.getElementById('temp-val').textContent = temp+'°C';
+  document.getElementById('cpu-bar').style.width = cpu+'%';
+  document.getElementById('cpu-val').textContent = cpu+'%';
+}, 2000);
+
+// ── VOICE CYCLING ──
+let voiceIdx = 0;
+setInterval(() => {
+  voiceIdx = (voiceIdx + 1) % voiceLines.length;
+  document.getElementById('voice-text').textContent = voiceLines[voiceIdx];
+  // update alert count
+  const a = parseInt(document.getElementById('stat-alerts').textContent);
+  document.getElementById('stat-alerts').textContent = a + 1;
+}, 4000);
+
+// ── NEAREST DIST FLUCTUATION ──
+setInterval(() => {
+  const d = (0.8 + Math.random()*2.5).toFixed(1);
+  document.getElementById('stat-dist').innerHTML =
+    `${d}<span style="font-size:14px;font-weight:300;">m</span>`;
+}, 3000);
+
+// ── CONTROLS ──
+function setMode(el, mode) {
+  document.querySelectorAll('.cam-mode-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const overlay = document.getElementById('depth-overlay');
+  overlay.style.opacity = mode === 'DEPTH' ? '0.6' : mode === 'OVERLAY' ? '0.35' : '0.05';
+}
+
+function toggleFilter(el, f) {
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleTTS(el) {
+  const wave = document.getElementById('voice-wave');
+  if (el.classList.contains('active')) {
+    el.classList.remove('active');
+    el.textContent = '🔇 TTS OFF';
+    wave.style.opacity = '0.2';
+  } else {
+    el.classList.add('active');
+    el.textContent = '🔊 TTS ON';
+    wave.style.opacity = '1';
+  }
+}
+</script>
+<script src="dashboard_bridge.js"></script>
+</body>
+</html>
