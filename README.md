@@ -2,6 +2,8 @@
 
 NAVAI is a local real-time assistive navigation backend. It combines YOLOv8 object detection, MiDaS depth estimation, distance/direction fusion, non-blocking voice guidance, an OpenCV HUD, GPU metrics, and a WebSocket feed for the dashboard.
 
+It also includes a depth-based unknown obstacle layer for surfaces YOLO may not classify, such as close walls, generic front obstacles, and possible stairs/drop regions. These are heuristic alerts from the depth map, not custom-trained semantic classes.
+
 ## Manual Install
 
 ```powershell
